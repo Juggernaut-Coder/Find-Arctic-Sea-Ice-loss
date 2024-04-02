@@ -1,0 +1,59 @@
+#!/bin/sh
+
+#THIS BUILD SOLUTION SHOULD WORK ANY C PROGRAMMING SOLUTION AS LONG AS IT CONFORMS TO THE SAME FOLDER STRUCTURE
+#THIS BUILD SOLUTION WILL ONLY WORK IN ANY POSIX CONFORMING SHELL
+#THIS SOLUTION IS IDEAL FOR VERY SMALL PROGRAMS
+
+PROGRAM_NAME="search_arctic"
+SOURCE_DIR="src"
+files_timestamp="files_timestamp.txt"
+
+compile() {
+	for file in $SOURCE_DIR/*.c; do
+		files="${files:=$files} $file"
+	done
+	gcc -ggdb3 -std=c17 $files -Wall -o $1 && echo "An executable $1 has been created" || echo "Failed to complie!!!"
+	unset file files
+	return 0
+}
+
+compile_with_msg() {
+	CURRENT_MOD_TIME="$( stat -c %Z $SOURCE_DIR $SOURCE_DIR/headers $SOURCE_DIR/*.c $SOURCE_DIR/headers/*.h )"
+	echo "$CURRENT_MOD_TIME" > $files_timestamp
+	echo "Timestamps of files attempting to complie: \n$CURRENT_MOD_TIME\n"
+	echo "Compiling and linking files..."
+	compile $PROGRAM_NAME
+	return 0
+}
+
+compile_with_msg_changes(){
+	echo "Changes in source files detected"
+	rm $PROGRAM_NAME $files_timestamp && echo "Deleted existing $PROGRAM_NAME executable and $files_timestamp"
+	compile_with_msg
+	return 0
+}
+
+build() {		
+	[ ! -d $SOURCE_DIR ] && echo "Cannot find the source directory\nPlease open the build scipt in an editor and check if the source directory information is correct" && return 2
+	if [ ! -f $PROGRAM_NAME ]; then
+		[ -f $files_timestamp ] && rm $files_timestamp && echo "Error: $PROGRAM_NAME does not exist but $files_timestamp from last compilation exists\nRemoved $files_timestamp" && return 1
+		compile_with_msg
+	else
+		[ ! -f $files_timestamp ] && rm "$PROGRAM_NAME" && echo "Error: $files_timestamp not found\nDeleted $PROGRAM_NAME" && return 1
+		CURRENT_MOD_TIME="$( stat -c %Z $SOURCE_DIR $SOURCE_DIR/headers $SOURCE_DIR/*.c $SOURCE_DIR/headers/*.h )"
+		LAST_MOD_TIME="$( cat $files_timestamp )"
+		[ "$CURRENT_MOD_TIME" = "$LAST_MOD_TIME" ] && echo "$PROGRAM_NAME is up to date" || compile_with_msg_changes
+		unset CURRENT_MOD_TIME LAST_MOD_TIME
+	fi
+	return 0
+}
+
+main() {
+	err_check=1
+	while [ "$err_check" -eq 1 ]; do
+		build
+		err_check=$?
+	done
+	return 0
+}
+main
